@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin & Lab Manager Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+
+    <!-- Navbar Header -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="bi bi-diagram-3-fill me-2"></i>Lab Asset Tracker - Admin Portal
+            </a>
+            <div class="d-flex align-items-center text-white">
+                <span class="me-3"><i class="bi bi-person-circle me-1"></i> {{ user.full_name }} (<strong>{{ user.role }}</strong>)</span>
+                <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right"></i> Đăng xuất</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 py-4">
+
+        <!-- Thống kê nhanh (Stat Cards) -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white shadow-sm border-0">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1" style="font-size: 0.8rem;">Tổng Số Thiết Bị</h6>
+                            <h2 class="mb-0 fw-bold">{{ stats.total }}</h2>
+                        </div>
+                        <i class="bi bi-box-seam fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white shadow-sm border-0">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1" style="font-size: 0.8rem;">Đang Sử Dụng / Mượn</h6>
+                            <h2 class="mb-0 fw-bold">{{ stats.in_use }}</h2>
+                        </div>
+                        <i class="bi bi-arrow-repeat fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white shadow-sm border-0">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1" style="font-size: 0.8rem;">Quá Hạn Trả</h6>
+                            <h2 class="mb-0 fw-bold">{{ stats.overdue }}</h2>
+                        </div>
+                        <i class="bi bi-exclamation-triangle-fill fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-dark shadow-sm border-0">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1" style="font-size: 0.8rem;">Yêu Cầu Chờ Duyệt</h6>
+                            <h2 class="mb-0 fw-bold">{{ stats.pending }}</h2>
+                        </div>
+                        <i class="bi bi-clock-history fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thanh Tabs Điều Hướng Chức Năng -->
+        <ul class="nav nav-tabs mb-3" id="adminTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-bold" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets-pane" type="button"><i class="bi bi-list-task me-1"></i> Quản Lý Thiết Bị</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-warning fw-bold position-relative" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-pane" type="button">
+                    <i class="bi bi-clock-history me-1"></i> Yêu Cầu Chờ Duyệt
+                    {% if stats.pending > 0 %}
+                    <span class="badge rounded-pill bg-danger ms-1">{{ stats.pending }}</span>
+                    {% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-success fw-bold" id="active-loans-tab" data-bs-toggle="tab" data-bs-target="#active-loans-pane" type="button">
+                    <i class="bi bi-arrow-down-up me-1"></i> Đang Cho Mượn (Chờ Thu Hồi)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-danger fw-bold" id="overdue-tab" data-bs-toggle="tab" data-bs-target="#overdue-pane" type="button"><i class="bi bi-alarm me-1"></i> Thiết Bị Quá Hạn ({{ stats.overdue }})</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-bold" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary-pane" type="button"><i class="bi bi-pie-chart me-1"></i> Báo Cáo Giá Trị Theo Lab</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="adminTabContent">
+
+            <!-- TAB 1: QUẢN LÝ THIẾT BỊ -->
+            <div class="tab-pane fade show active" id="assets-pane" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-primary">Danh Sách Tài Sản Nghiên Cứu</h5>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAssetModal">
+                            <i class="bi bi-plus-circle me-1"></i> Thêm Thiết Bị Mới
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Mã Tài Sản (Asset ID)</th>
+                                        <th>Tên Thiết Bị</th>
+                                        <th>Phòng Lab</th>
+                                        <th>Phân Loại</th>
+                                        <th>Mức Rủi Ro</th>
+                                        <th>Giá Trị ($)</th>
+                                        <th>Trạng Thái</th>
+                                        <th>Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for asset in assets %}
+                                    <tr>
+                                        <td class="fw-bold text-secondary">{{ asset.asset_code }}</td>
+                                        <td>{{ asset.asset_name }}</td>
+                                        <td>{{ asset.lab_name }}</td>
+                                        <td><span class="badge bg-secondary">{{ asset.category }}</span></td>
+                                        <td>
+                                            {% if asset.hazard_level == 'High' %}
+                                                <span class="badge bg-danger">High Hazard</span>
+                                            {% elif asset.hazard_level == 'Medium' %}
+                                                <span class="badge bg-warning text-dark">Medium</span>
+                                            {% else %}
+                                                <span class="badge bg-info text-dark">Low / None</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>${{ "{:,.2f}".format(asset.purchase_price) }}</td>
+                                        <td>
+                                            {% if asset.status == 'Available' %}
+                                                <span class="badge bg-success">Sẵn sàng</span>
+                                            {% elif asset.status == 'In Use' %}
+                                                <span class="badge bg-primary">Đang mượn</span>
+                                            {% elif asset.status == 'Under Maintenance' %}
+                                                <span class="badge bg-warning text-dark">Bảo trì</span>
+                                            {% else %}
+                                                <span class="badge bg-dark">Thanh lý</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if asset.status == 'Available' %}
+                                                <a href="/admin/update_status/{{ asset.asset_id }}/Under%20Maintenance" class="btn btn-outline-warning btn-sm">Chuyển Bảo Trì</a>
+                                            {% elif asset.status == 'Under Maintenance' %}
+                                                <a href="/admin/update_status/{{ asset.asset_id }}/Available" class="btn btn-outline-success btn-sm">Xong Bảo Trì</a>
+                                            {% else %}
+                                                <button class="btn btn-light btn-sm" disabled>Khóa</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">Chưa có dữ liệu thiết bị.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: YÊU CẦU CHỜ PHÊ DUYỆT (PENDING) -->
+            <div class="tab-pane fade" id="pending-pane" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-dark py-3">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Danh Sách Đăng Ký Mượn Chờ Duyệt</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Mã Phiếu</th>
+                                        <th>Tên Thiết Bị</th>
+                                        <th>Người Yêu Cầu</th>
+                                        <th>Vai Trò</th>
+                                        <th>Mức Rủi Ro</th>
+                                        <th>Thời Gian Đăng Ký</th>
+                                        <th>Thao Tác Phê Duyệt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in pending_loans %}
+                                    <tr>
+                                        <td class="fw-bold text-secondary">{{ row.loan_code or row.loan_id }}</td>
+                                        <td class="fw-bold">{{ row.asset_name }}</td>
+                                        <td>{{ row.borrower_name }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ row.borrower_role }}</span></td>
+                                        <td>
+                                            {% if row.hazard_level == 'High' %}
+                                                <span class="badge bg-danger">High</span>
+                                            {% elif row.hazard_level == 'Medium' %}
+                                                <span class="badge bg-warning text-dark">Medium</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Low / None</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ row.checkout_date }}</td>
+                                        <td>
+                                            <a href="/admin/approve_loan/{{ row.loan_id }}" 
+                                               class="btn btn-sm btn-success me-1 shadow-sm"
+                                               onclick="return confirm('Xác nhận đồng ý phê duyệt cho mượn thiết bị này?');">
+                                                <i class="bi bi-check-lg"></i> Chấp Nhận
+                                            </a>
+                                            <a href="/admin/reject_loan/{{ row.loan_id }}" 
+                                               class="btn btn-sm btn-outline-danger shadow-sm"
+                                               onclick="return confirm('TỪ CHỐI yêu cầu mượn này?');">
+                                                <i class="bi bi-x-lg"></i> Từ Chối
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">Không có yêu cầu mượn nào đang chờ phê duyệt.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: ĐANG CHO MƯỢN (CHỜ THU HỒI) -->
+            <div class="tab-pane fade" id="active-loans-pane" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white py-3">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-arrow-down-up me-2"></i>Danh Sách Đang Cho Mượn</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Mã Phiếu</th>
+                                        <th>Tên Thiết Bị</th>
+                                        <th>Người Mượn</th>
+                                        <th>Ngày Bắt Đầu</th>
+                                        <th>Hạn Trả</th>
+                                        <th>Thao Tác Quản Lý</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in active_loans %}
+                                    <tr>
+                                        <td class="fw-bold text-secondary">{{ row.loan_code or row.loan_id }}</td>
+                                        <td class="fw-bold">{{ row.asset_name }}</td>
+                                        <td>{{ row.borrower_name }}</td>
+                                        <td>{{ row.checkout_date }}</td>
+                                        <td>{{ row.due_date }}</td>
+                                        <td>
+                                            <a href="/admin/return_asset/{{ row.loan_id }}/{{ row.asset_id }}" 
+                                               class="btn btn-sm btn-success shadow-sm" 
+                                               onclick="return confirm('Sinh viên đã đem trả thiết bị này? Xác nhận thu hồi?');">
+                                               <i class="bi bi-check-circle me-1"></i> Đã nhận lại máy
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">Không có thiết bị nào đang cho mượn.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: BÁO CÁO QUÁ HẠN -->
+            <div class="tab-pane fade" id="overdue-pane" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white py-3">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-octagon me-2"></i>Danh Sách Thiết Bị Quá Hạn Trả</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Mã Phiếu</th>
+                                        <th>Mã Thiết Bị</th>
+                                        <th>Tên Thiết Bị</th>
+                                        <th>Người Mượn</th>
+                                        <th>Email Liên Hệ</th>
+                                        <th>Số Điện Thoại</th>
+                                        <th>Hạn Trả</th>
+                                        <th>Số Ngày Trễ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in overdue %}
+                                    <tr>
+                                        <td>#{{ row.loan_id }}</td>
+                                        <td class="fw-bold">{{ row.asset_id }}</td>
+                                        <td>{{ row.asset_name }}</td>
+                                        <td>{{ row.borrower_name }}</td>
+                                        <td><a href="mailto:{{ row.borrower_email }}">{{ row.borrower_email }}</a></td>
+                                        <td>{{ row.borrower_phone or 'N/A' }}</td>
+                                        <td>{{ row.due_date }}</td>
+                                        <td><span class="badge bg-danger fs-6">{{ row.days_overdue }} ngày</span></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">Hiện tại không có thiết bị nào quá hạn.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: BÁO CÁO THỐNG KÊ GIÁ TRỊ TÀI SẢN -->
+            <div class="tab-pane fade" id="summary-pane" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0 fw-bold text-primary">Tổng Giá Trị Phân Bổ Theo Phòng Lab & Khoa</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle mb-0">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Khoa / Bộ Môn</th>
+                                        <th>Tên Phòng Lab</th>
+                                        <th>Vị Trí Room</th>
+                                        <th>Tổng Số Thiết Bị</th>
+                                        <th>Tổng Giá Trị Tài Sản (USD)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in summary %}
+                                    <tr>
+                                        <td class="fw-bold">{{ row.dept_name }}</td>
+                                        <td>{{ row.lab_name }}</td>
+                                        <td><code>{{ row.room_location }}</code></td>
+                                        <td class="text-center"><span class="badge bg-info text-dark fs-6">{{ row.total_assets }}</span></td>
+                                        <td class="fw-bold text-success">${{ "{:,.2f}".format(row.total_asset_value or 0) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- Đóng tab-content -->
+    </div>
+
+    <!-- Modal Thêm Thiết Bị Mới -->
+    <div class="modal fade" id="addAssetModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/admin/add_asset" method="POST">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">Thêm Thiết Bị Mới</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Chọn Phòng Lab quản lý:</label>
+                            <select name="lab_id" class="form-select" required>
+                                {% for lab in labs %}
+                                    <option value="{{ lab.lab_id }}">{{ lab.lab_name }} ({{ lab.lab_id }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nhà cung cấp (Supplier):</label>
+                            <select name="supplier_id" class="form-select" required>
+                                {% for sup in suppliers %}
+                                    <option value="{{ sup.supplier_id }}">{{ sup.supplier_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tên thiết bị:</label>
+                            <input type="text" name="asset_name" class="form-control" placeholder="Kính hiển vi quang học" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Danh mục:</label>
+                                <select name="category" class="form-select">
+                                    <option value="Optics">Optics</option>
+                                    <option value="Computing">Computing</option>
+                                    <option value="Spectrometry">Spectrometry</option>
+                                    <option value="General">General</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Mức nguy hiểm:</label>
+                                <select name="hazard_level" class="form-select">
+                                    <option value="None">None</option>
+                                    <option value="Low" selected>Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Số Sê-ri (Serial Number):</label>
+                            <input type="text" name="serial_number" class="form-control" placeholder="SN-998877" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Giá mua ($ USD):</label>
+                            <input type="number" step="0.01" name="purchase_price" class="form-control" value="500.00" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Lưu Thiết Bị</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

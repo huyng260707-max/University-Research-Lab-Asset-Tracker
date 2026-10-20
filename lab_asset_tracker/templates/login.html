@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng nhập - Lab Asset Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center vh-100">
+    <div class="container" style="max-width: 400px;">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h4 class="card-title text-center mb-4">Lab Asset Tracker</h4>
+                
+                <!-- Khối hiển thị thông báo lỗi khi đăng nhập thất bại -->
+                {% if error %}
+                    <div class="alert alert-danger p-2 text-center mb-3" role="alert">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form action="/" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Email trường:</label>
+                        <input type="email" name="email" class="form-control" placeholder="user_1@university.edu.vn" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mật khẩu:</label>
+                        <input type="password" name="password" class="form-control" value="123456" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Đăng Nhập</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
