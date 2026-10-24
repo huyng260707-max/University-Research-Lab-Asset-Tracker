@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Phòng Lab - Admin Dashboard</title>
+    <!-- Sử dụng Bootstrap 5 cho giao diện -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary">Bảng Điều Khiển Quản Lý Phòng Lab</h2>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Đăng xuất</a>
+    </div>
+
+    <!-- Hiển thị thông báo (Flash messages) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Điều hướng Tabs -->
+    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                1. Duyệt Đơn Mượn
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="active-tab" data-bs-toggle="tab" data-bs-target="#active" type="button" role="tab">
+                2. Đang Mượn & Thu Hồi
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link text-danger fw-bold" id="overdue-tab" data-bs-toggle="tab" data-bs-target="#overdue" type="button" role="tab">
+                3. Quá Hạn
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">
+                4. Kho & Bảo Trì
+            </button>
+        </li>
+    </ul>
+
+    <!-- Nội dung Tabs -->
+    <div class="tab-content bg-white p-4 border border-top-0 rounded-bottom shadow-sm" id="adminTabsContent">
+        
+        <!-- TAB 1: DUYỆT ĐƠN (PENDING) -->
+        <div class="tab-pane fade show active" id="pending" role="tabpanel" aria-labelledby="pending-tab">
+            <h4 class="mb-3 text-primary">Danh Sách Đơn Cần Duyệt</h4>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mã Đơn</th>
+                            <th>Sinh viên</th>
+                            <th>Thiết bị</th>
+                            <th>TG Bắt đầu</th>
+                            <th>TG Trả dự kiến</th>
+                            <th>Lý do mượn</th>
+                            <th class="text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loan in pending_loans %}
+                        <tr>
+                            <td>{{ loan.loan_code or loan.loan_id }}</td>
+                            <td>{{ loan.student_name }} (ID: {{ loan.personnel_id }})</td>
+                            <td>{{ loan.asset_name }} (ID: {{ loan.asset_id }})</td>
+                            <td>{{ loan.checkout_date }}</td>
+                            <td>{{ loan.due_date }}</td>
+                            <td>{{ loan.loan_reason }}</td>
+                            <td class="text-center">
+                                <!-- Nút Duyệt -->
+                                <form action="{{ url_for('approve_loan', loan_id=loan.loan_id) }}" method="POST" class="d-inline">
+                                    <input type="hidden" name="action" value="Approve">
+                                    <button type="submit" class="btn btn-success btn-sm">Duyệt</button>
+                                </form>
+                                <!-- Nút Từ chối -->
+                                <form action="{{ url_for('approve_loan', loan_id=loan.loan_id) }}" method="POST" class="d-inline">
+                                    <input type="hidden" name="action" value="Reject">
+                                    <button type="submit" class="btn btn-danger btn-sm">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="text-center text-muted">Không có đơn mượn nào đang chờ duyệt.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: ĐANG MƯỢN & THU HỒI (ACTIVE) -->
+        <div class="tab-pane fade" id="active" role="tabpanel" aria-labelledby="active-tab">
+            <h4 class="mb-3 text-success">Sinh Viên Đang Mượn Máy</h4>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mã Đơn</th>
+                            <th>Sinh viên</th>
+                            <th>Thiết bị</th>
+                            <th>Hạn trả dự kiến</th>
+                            <th class="text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loan in active_loans %}
+                        <tr>
+                            <td>{{ loan.loan_code or loan.loan_id }}</td>
+                            <td>{{ loan.student_name }}</td>
+                            <td>{{ loan.asset_name }}</td>
+                            <td>{{ loan.due_date }}</td>
+                            <td class="text-center">
+                                <form action="{{ url_for('admin_return_loan', loan_id=loan.loan_id) }}" method="POST">
+                                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Xác nhận sinh viên đã đem máy lên phòng Lab trả?');">
+                                        Xác nhận đã nhận máy
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">Không có thiết bị nào đang được mượn.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 3: QUÁ HẠN (OVERDUE) -->
+        <div class="tab-pane fade" id="overdue" role="tabpanel" aria-labelledby="overdue-tab">
+            <h4 class="mb-3 text-danger">Danh Sách Vi Phạm Hạn Trả</h4>
+            <div class="table-responsive">
+                <table class="table table-bordered table-danger align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Mã Đơn</th>
+                            <th>Sinh viên</th>
+                            <th>Liên hệ (Email/SĐT)</th>
+                            <th>Thiết bị</th>
+                            <th>Ngày quá hạn</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in overdue_loans %}
+                        <tr>
+                            <td>{{ item.loan_code or item.loan_id }}</td>
+                            <td>{{ item.borrower_name }}</td>
+                            <td>{{ item.borrower_phone or 'N/A' }} / {{ item.borrower_email }}</td>
+                            <td>{{ item.asset_name }} (ID: {{ item.asset_id }})</td>
+                            <td class="fw-bold">{{ item.days_overdue }} ngày</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-success fw-bold">Tuyệt vời! Hệ thống không có đơn nào quá hạn.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 4: KHO & BẢO TRÌ (INVENTORY) -->
+        <div class="tab-pane fade" id="inventory" role="tabpanel" aria-labelledby="inventory-tab">
+            <h4 class="mb-3 text-secondary">Kho Thiết Bị & Trạng Thái</h4>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Mã Máy</th>
+                            <th>Tên Thiết Bị</th>
+                            <th>Phòng Lab</th>
+                            <th>Trạng thái</th>
+                            <th class="text-center" style="width: 350px;">Gửi Bảo Trì</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asset in assets %}
+                        <tr>
+                            <td>{{ asset.asset_code or asset.asset_id }}</td>
+                            <td>{{ asset.asset_name }}</td>
+                            <td>{{ asset.lab_name }}</td>
+                            <td>
+                                {% if asset.status == 'Available' %}
+                                    <span class="badge bg-success">Sẵn sàng</span>
+                                {% elif asset.status == 'Under Maintenance' %}
+                                    <span class="badge bg-warning text-dark">Đang bảo trì</span>
+                                {% elif asset.status == 'In Use' %}
+                                    <span class="badge bg-primary">Đang cho mượn</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ asset.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if asset.status == 'Available' %}
+                                    <!-- Chỉ hiển thị form Gửi bảo trì nếu là Admin -->
+                                    {% if session['role'] in ['Lab Manager', 'Technician'] %}
+                                    <form action="{{ url_for('admin_maintenance_asset', asset_id=asset.asset_id) }}" method="POST" class="d-flex gap-2">
+                                        <input type="text" name="issue_description" class="form-control form-control-sm" placeholder="Mô tả sự cố/bảo trì..." required>
+                                        <button type="submit" class="btn btn-warning btn-sm text-nowrap">Gửi bảo trì</button>
+                                    </form>
+                                    {% else %}
+                                        <span class="text-muted fst-italic">Liên hệ Admin để bảo trì</span>
+                                    {% endif %}
+                                    
+                                {% elif asset.status == 'Under Maintenance' %}
+                                    <!-- Chỉ hiển thị nút Hoàn tất nếu là Admin -->
+                                    {% if session['role'] in ['Lab Manager', 'Technician'] %}
+                                    <form action="{{ url_for('admin_finish_maintenance', asset_id=asset.asset_id) }}" method="POST" class="d-flex justify-content-center">
+                                        <button type="submit" class="btn btn-success btn-sm">Hoàn tất bảo trì</button>
+                                    </form>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Đang được sửa chữa</span>
+                                    {% endif %}
+                                    
+                                {% else %}
+                                    <span class="text-muted fst-italic">Không thể can thiệp khi máy đang được mượn</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

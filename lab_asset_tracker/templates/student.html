@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cổng Sinh Viên - Mượn Thiết Bị</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary">Cổng Thông Tin Sinh Viên</h2>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Đăng xuất</a>
+    </div>
+
+    <!-- Hiển thị thông báo (Flash messages) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <!-- CỘT TRÁI: KHO THIẾT BỊ & TÌM KIẾM -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-secondary">Danh Sách Thiết Bị Tại Lab</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Bộ lọc và Tìm kiếm -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-8">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm tên thiết bị..." onkeyup="filterAssets()">
+                        </div>
+                        <div class="col-md-4">
+                            <select id="statusFilter" class="form-select" onchange="filterAssets()">
+                                <option value="All">Tất cả trạng thái</option>
+                                <option value="Available">Sẵn sàng</option>
+                                <option value="Loaned">Đang có người mượn</option>
+                                <option value="Maintenance">Đang bảo trì</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Bảng thiết bị -->
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-hover align-middle" id="assetTable">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Mã Máy</th>
+                                    <th>Tên Thiết Bị</th>
+                                    <th>Trạng thái</th>
+                                    <th class="text-center">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for asset in assets %}
+                                <tr data-status="{{ asset.status }}">
+                                    <td>{{ asset.asset_id }}</td>
+                                    <td class="fw-bold">{{ asset.asset_name }}</td>
+                                    <td>
+                                        {% if asset.status == 'Available' %}
+                                            <span class="badge bg-success">Sẵn sàng</span>
+                                        {% elif asset.status == 'Loaned' %}
+                                            <span class="badge bg-secondary">Đang có người mượn</span>
+                                        {% elif asset.status == 'Maintenance' %}
+                                            <span class="badge bg-warning text-dark">Đang bảo trì</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if asset.status == 'Available' %}
+                                            <button class="btn btn-primary btn-sm" onclick="openBorrowModal('{{ asset.asset_id }}', '{{ asset.asset_name }}')">
+                                                Mượn ngay
+                                            </button>
+                                        {% else %}
+                                            <button class="btn btn-secondary btn-sm" disabled>Không khả dụng</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CỘT PHẢI: LỊCH SỬ MƯỢN CỦA SINH VIÊN -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-secondary">Đơn Mượn Của Tôi</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 570px; overflow-y: auto;">
+                        <table class="table table-striped table-hover mb-0 align-middle">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th class="ps-3">Thiết bị</th>
+                                    <th>Hạn trả</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loan in my_loans %}
+                                <tr>
+                                    <td class="ps-3">{{ loan.asset_name }}</td>
+                                    <td>{{ loan.end_time }}</td>
+                                    <td>
+                                        {% if loan.status == 'Pending' %}
+                                            <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                                        {% elif loan.status == 'Active' %}
+                                            <span class="badge bg-primary">Đang mượn</span>
+                                        {% elif loan.status == 'Returned' %}
+                                            <span class="badge bg-success">Đã trả</span>
+                                        {% elif loan.status == 'Overdue' %}
+                                            <span class="badge bg-danger">Quá hạn</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" class="text-center text-muted py-3">Bạn chưa có đơn mượn nào.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL FORM MƯỢN THIẾT BỊ -->
+<div class="modal fade" id="borrowModal" tabindex="-1" aria-labelledby="borrowModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('create_loan') }}" method="POST">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="borrowModalLabel">Tạo Đơn Mượn Thiết Bị</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Thiết bị mượn</label>
+            <input type="text" class="form-control" id="modalAssetName" readonly disabled>
+            <!-- Input ẩn chứa ID thiết bị gửi về server -->
+            <input type="hidden" name="asset_id" id="modalAssetId">
+          </div>
+          
+          <!-- Bổ sung: Chọn Dự án -->
+          <div class="mb-3">
+            <label class="form-label fw-bold">Thuộc dự án (Tùy chọn)</label>
+            <select class="form-select" name="project_id">
+                <option value="">-- Không thuộc dự án nào --</option>
+                {% for p in projects %}
+                <option value="{{ p.project_id }}">{{ p.title }}</option>
+                {% endfor %}
+            </select>
+          </div>
+
+          <!-- Bổ sung: Lý do mượn -->
+          <div class="mb-3">
+            <label class="form-label fw-bold">Lý do mượn</label>
+            <textarea class="form-control" name="loan_reason" rows="2" placeholder="VD: Mượn làm thí nghiệm môn Hóa sinh..." required></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Thời gian bắt đầu</label>
+            <input type="datetime-local" class="form-control" name="start_time" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Thời gian trả dự kiến</label>
+            <input type="datetime-local" class="form-control" name="end_time" required>
+            <div class="form-text text-danger">Lưu ý: Mượn tối đa 48h nếu không thuộc dự án (Project).</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="submit" class="btn btn-primary">Gửi Yêu Cầu Mượn</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Hàm JavaScript để Lọc/Tìm kiếm thiết bị trong bảng
+    function filterAssets() {
+        var input = document.getElementById("searchInput").value.toLowerCase();
+        var filterStatus = document.getElementById("statusFilter").value;
+        var table = document.getElementById("assetTable");
+        var tr = table.getElementsByTagName("tr");
+
+        for (var i = 1; i < tr.length; i++) {
+            var tdName = tr[i].getElementsByTagName("td")[1]; // Cột Tên thiết bị
+            var status = tr[i].getAttribute("data-status");
+            
+            if (tdName) {
+                var textValue = tdName.textContent || tdName.innerText;
+                var matchName = textValue.toLowerCase().indexOf(input) > -1;
+                var matchStatus = (filterStatus === "All" || status === filterStatus);
+                
+                if (matchName && matchStatus) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    }
+
+    // Hàm mở Modal và điền sẵn thông tin thiết bị
+    function openBorrowModal(assetId, assetName) {
+        document.getElementById('modalAssetId').value = assetId;
+        document.getElementById('modalAssetName').value = assetName + " (ID: " + assetId + ")";
+        var borrowModal = new bootstrap.Modal(document.getElementById('borrowModal'));
+        borrowModal.show();
+    }
+</script>
+
+</body>
+</html>
