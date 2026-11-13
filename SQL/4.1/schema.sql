@@ -1,5 +1,5 @@
 -- ============================================================================
--- DATABASE SCHEMA ACCORDING TO REVISED REPORT
+-- PROJECT: University Research & Lab Asset Tracker
 -- ============================================================================
 DROP DATABASE IF EXISTS lab_asset_tracker; 
 CREATE DATABASE lab_asset_tracker CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; 
@@ -7,7 +7,7 @@ USE lab_asset_tracker;
 
 SET GLOBAL event_scheduler = ON;
 
--- 1. BẢNG DỮ LIỆU
+-- 1.1 Bảng Department (Khoa / Bộ môn)
 CREATE TABLE department (
     department_id INT AUTO_INCREMENT PRIMARY KEY,
     dept_code VARCHAR(20) NOT NULL UNIQUE,
@@ -16,6 +16,7 @@ CREATE TABLE department (
     phone VARCHAR(20) NULL
 ) ENGINE=InnoDB;
 
+-- 1.2 Bảng Lab (Phòng thí nghiệm)
 CREATE TABLE lab (
     lab_id INT AUTO_INCREMENT PRIMARY KEY,
     lab_code VARCHAR(20) NOT NULL UNIQUE,
@@ -27,6 +28,7 @@ CREATE TABLE lab (
     CONSTRAINT fk_lab_department FOREIGN KEY (department_id) REFERENCES department(department_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- 1.3 Bảng Personnel (Nhân sự & Sinh viên)
 CREATE TABLE personnel (
     personnel_id INT AUTO_INCREMENT PRIMARY KEY,
     personnel_code VARCHAR(20) NOT NULL UNIQUE,
@@ -41,26 +43,7 @@ CREATE TABLE personnel (
     CONSTRAINT fk_personnel_department FOREIGN KEY (department_id) REFERENCES department(department_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
-CREATE TABLE safety_certification (
-    cert_id INT AUTO_INCREMENT PRIMARY KEY,
-    cert_code VARCHAR(20) NOT NULL UNIQUE,
-    cert_name VARCHAR(100) NOT NULL,
-    validity_months INT NOT NULL DEFAULT 12,
-    description TEXT NOT NULL,
-    CONSTRAINT chk_cert_validity CHECK (validity_months > 0)
-) ENGINE=InnoDB;
-
-CREATE TABLE personnel_certification (
-    personnel_id INT NOT NULL,
-    cert_id INT NOT NULL,
-    issue_date DATE NOT NULL DEFAULT (CURRENT_DATE),
-    expiry_date DATE NOT NULL,
-    PRIMARY KEY (personnel_id, cert_id),
-    CONSTRAINT chk_cert_dates CHECK (expiry_date > issue_date),
-    CONSTRAINT fk_pc_personnel FOREIGN KEY (personnel_id) REFERENCES personnel(personnel_id) ON DELETE CASCADE,
-    CONSTRAINT fk_pc_cert FOREIGN KEY (cert_id) REFERENCES safety_certification(cert_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
+-- 1.4 Bảng Research Project (Đề tài nghiên cứu)
 CREATE TABLE research_project (
     project_id INT AUTO_INCREMENT PRIMARY KEY,
     project_code VARCHAR(30) NOT NULL UNIQUE,
@@ -79,6 +62,7 @@ CREATE TABLE research_project (
     CONSTRAINT fk_project_lab FOREIGN KEY (lab_id) REFERENCES lab(lab_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- 1.5 Bảng Project Assignment (Phân công tham gia đề tài)
 CREATE TABLE project_assignment (
     assignment_id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,
@@ -90,6 +74,7 @@ CREATE TABLE project_assignment (
     CONSTRAINT fk_pa_personnel FOREIGN KEY (personnel_id) REFERENCES personnel(personnel_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- 1.6 Bảng Supplier (Nhà cung cấp)
 CREATE TABLE supplier (
     supplier_id INT AUTO_INCREMENT PRIMARY KEY,
     supplier_code VARCHAR(20) NOT NULL UNIQUE,
@@ -99,6 +84,7 @@ CREATE TABLE supplier (
     address VARCHAR(255) NULL
 ) ENGINE=InnoDB;
 
+-- 1.7 Bảng Asset (Thiết bị / Tài sản)
 CREATE TABLE asset (
     asset_id INT AUTO_INCREMENT PRIMARY KEY,
     asset_code VARCHAR(30) NOT NULL UNIQUE,
@@ -119,35 +105,29 @@ CREATE TABLE asset (
     CONSTRAINT fk_asset_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
-CREATE TABLE asset_required_certification (
-    asset_id INT NOT NULL,
-    cert_id INT NOT NULL,
-    PRIMARY KEY (asset_id, cert_id),
-    CONSTRAINT fk_arc_asset FOREIGN KEY (asset_id) REFERENCES asset(asset_id) ON DELETE CASCADE,
-    CONSTRAINT fk_arc_cert FOREIGN KEY (cert_id) REFERENCES safety_certification(cert_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
+-- 1.8 Bảng Asset Loan (Lượt mượn / trả thiết bị - ĐÃ FIX 3NF)
 CREATE TABLE asset_loan (
     loan_id INT AUTO_INCREMENT PRIMARY KEY,
     loan_code VARCHAR(30) NOT NULL UNIQUE,
     asset_id INT NOT NULL,
     personnel_id INT NOT NULL,
     project_id INT NULL,
+    loan_reason TEXT NOT NULL,
     checkout_date DATETIME NOT NULL DEFAULT NOW(),
     due_date DATETIME NOT NULL,
     return_date DATETIME NULL,
-    is_pi_approved BOOLEAN NOT NULL DEFAULT FALSE,
     approved_by_pi INT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
     CONSTRAINT chk_loan_due_date CHECK (due_date >= checkout_date),
     CONSTRAINT chk_loan_return_date CHECK (return_date IS NULL OR return_date >= checkout_date),
-    CONSTRAINT chk_loan_status CHECK (status IN ('Active', 'Returned', 'Overdue', 'Lost')),
+    CONSTRAINT chk_loan_status CHECK (status IN ('Pending', 'Active', 'Returned', 'Overdue', 'Lost', 'Rejected')),
     CONSTRAINT fk_loan_asset FOREIGN KEY (asset_id) REFERENCES asset(asset_id) ON DELETE RESTRICT,
     CONSTRAINT fk_loan_personnel FOREIGN KEY (personnel_id) REFERENCES personnel(personnel_id) ON DELETE RESTRICT,
     CONSTRAINT fk_loan_project FOREIGN KEY (project_id) REFERENCES research_project(project_id) ON DELETE SET NULL,
     CONSTRAINT fk_loan_pi FOREIGN KEY (approved_by_pi) REFERENCES personnel(personnel_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- 1.9 Bảng Maintenance Record (Hồ sơ bảo trì)
 CREATE TABLE maintenance_record (
     maintenance_id INT AUTO_INCREMENT PRIMARY KEY,
     record_code VARCHAR(30) NOT NULL UNIQUE,
@@ -165,9 +145,20 @@ CREATE TABLE maintenance_record (
     CONSTRAINT fk_maint_tech FOREIGN KEY (technician_id) REFERENCES personnel(personnel_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
--- 2. TRIGGERS TỰ ĐỘNG SINH MÃ CODE (GIÚP FLASK / APP.PY KHÔNG BỊ LỖI NOT NULL)
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+CREATE INDEX idx_asset_loan_status_dates ON asset_loan(asset_id, status, checkout_date, due_date);
+CREATE INDEX idx_asset_lab_status_cat ON asset(lab_id, status, category); 
+CREATE INDEX idx_maintenance_asset_status ON maintenance_record(asset_id, status, reported_date);
+CREATE INDEX idx_project_assignment_lookup ON project_assignment(personnel_id, project_id); 
+
+-- ============================================================================
+-- TRIGGERS NGHIỆP VỤ
+-- ============================================================================
 DELIMITER $$
 
+-- Trigger tự động tạo mã Asset Code
 CREATE TRIGGER trg_auto_asset_code BEFORE INSERT ON asset
 FOR EACH ROW BEGIN
     IF NEW.asset_code IS NULL OR NEW.asset_code = '' THEN
@@ -175,6 +166,7 @@ FOR EACH ROW BEGIN
     END IF;
 END$$
 
+-- Trigger tự động tạo mã Loan Code
 CREATE TRIGGER trg_auto_loan_code BEFORE INSERT ON asset_loan
 FOR EACH ROW BEGIN
     IF NEW.loan_code IS NULL OR NEW.loan_code = '' THEN
@@ -182,68 +174,178 @@ FOR EACH ROW BEGIN
     END IF;
 END$$
 
--- Trigger kiểm tra điều kiện mượn (BR-04, BR-05, BR-09)
-CREATE TRIGGER trg_before_insert_asset_loan BEFORE INSERT ON asset_loan
-FOR EACH ROW BEGIN
-    DECLARE v_asset_status VARCHAR(30);
-    DECLARE v_missing_certs INT DEFAULT 0;
-    DECLARE v_overlap_count INT DEFAULT 0;
-
-    SELECT status INTO v_asset_status FROM asset WHERE asset_id = NEW.asset_id;
-
-    IF v_asset_status != 'Available' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Loi: Thiet bi khong o trang thai Available.';
-    END IF;
-
-    SELECT COUNT(*) INTO v_missing_certs FROM asset_required_certification arc 
-    WHERE arc.asset_id = NEW.asset_id AND arc.cert_id NOT IN (
-        SELECT pc.cert_id FROM personnel_certification pc 
-        WHERE pc.personnel_id = NEW.personnel_id AND pc.expiry_date >= NEW.checkout_date
-    );
-    IF v_missing_certs > 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Loi: Thieu chung chi an toan con han.';
-    END IF;
-
-    SELECT COUNT(*) INTO v_overlap_count FROM asset_loan
-    WHERE asset_id = NEW.asset_id AND status = 'Active'
-      AND NOT (NEW.due_date < checkout_date OR NEW.checkout_date > due_date);
-    IF v_overlap_count > 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Loi: Trung lich muon thiet bi.';
+-- Trigger 1: Kiểm tra ngày mượn/trả hợp lệ (Áp dụng BR-04)
+CREATE TRIGGER trg_check_loan_dates_insert
+BEFORE INSERT ON asset_loan
+FOR EACH ROW
+BEGIN
+    IF NEW.due_date < NEW.checkout_date THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'BR-04 Error: due_date không được nhỏ hơn checkout_date.';
     END IF;
 END$$
 
-CREATE TRIGGER trg_after_insert_asset_loan AFTER INSERT ON asset_loan
-FOR EACH ROW BEGIN
-    IF NEW.status = 'Active' THEN UPDATE asset SET status = 'In Use' WHERE asset_id = NEW.asset_id; END IF;
+-- Trigger 2.1: Chống trùng lặp lịch mượn khi TẠO MỚI (Áp dụng BR-05)
+CREATE TRIGGER trg_prevent_overlapping_loans_insert
+BEFORE INSERT ON asset_loan
+FOR EACH ROW
+BEGIN
+    DECLARE overlap_count INT;
+    
+    SELECT COUNT(*) INTO overlap_count
+    FROM asset_loan
+    WHERE asset_id = NEW.asset_id
+      AND status IN ('Pending', 'Active')
+      AND (NEW.checkout_date <= due_date AND NEW.due_date >= checkout_date);
+      
+    IF overlap_count > 0 THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'BR-05 Error: Thiết bị này đã bị trùng lịch đặt chỗ trong khoảng thời gian trên.';
+    END IF;
 END$$
 
+-- Trigger 2.2: Chống lách luật dời lịch mượn khi CẬP NHẬT (Áp dụng BR-05 - ĐÃ FIX)
+CREATE TRIGGER trg_prevent_overlapping_loans_update
+BEFORE UPDATE ON asset_loan
+FOR EACH ROW
+BEGIN
+    DECLARE overlap_count INT;
+    
+    -- Chỉ kiểm tra trùng lịch nếu có sự thay đổi về thời gian
+    IF NEW.checkout_date != OLD.checkout_date OR NEW.due_date != OLD.due_date THEN
+        SELECT COUNT(*) INTO overlap_count
+        FROM asset_loan
+        WHERE asset_id = NEW.asset_id
+            AND loan_id != NEW.loan_id -- Bỏ qua chính đơn mượn đang được sửa
+            AND status IN ('Pending', 'Active')
+            AND (NEW.checkout_date <= due_date AND NEW.due_date >= checkout_date);
+          
+        IF overlap_count > 0 THEN
+            SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'BR-05 Error: Cập nhật thất bại. Khoảng thời gian mới bị trùng với lịch đặt chỗ khác.';
+        END IF;
+    END IF;
+END$$
+
+-- Trigger 3: Kiểm soát thời gian mượn của Sinh viên (Áp dụng BR-06 - ĐÃ FIX BIẾN & LOGIC)
+CREATE TRIGGER trg_check_student_loan_limit
+BEFORE INSERT ON asset_loan
+FOR EACH ROW
+BEGIN
+    DECLARE v_user_role VARCHAR(50);
+    DECLARE v_duration_hours INT;
+    DECLARE v_is_member INT DEFAULT 0;
+    
+    -- Lấy role của người mượn
+    SELECT role INTO v_user_role FROM personnel WHERE personnel_id = NEW.personnel_id;
+    
+    -- Tính số giờ mượn
+    SET v_duration_hours = TIMESTAMPDIFF(HOUR, NEW.checkout_date, NEW.due_date);
+    
+    -- Kiểm tra điều kiện BR-06
+    IF v_user_role = 'Student' AND v_duration_hours > 48 THEN
+        IF NEW.project_id IS NULL THEN
+            SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'BR-06 Error: Sinh viên mượn quá 48 giờ bắt buộc phải gắn mã Đề tài nghiên cứu (project_id).';
+        ELSE
+            -- Bắt buộc sinh viên phải là thành viên thực sự của Đề tài (Chống Fake project_id)
+            SELECT COUNT(*) INTO v_is_member
+            FROM project_assignment
+            WHERE project_id = NEW.project_id AND personnel_id = NEW.personnel_id;
+            
+            IF v_is_member = 0 THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'BR-06 Error: Sinh viên không phải là thành viên của Đề tài nghiên cứu này.';
+            END IF;
+        END IF;
+    END IF;
+END$$
+
+-- Trigger 4: Kiểm tra trạng thái tài sản trước khi cho mượn (Áp dụng BR-04 & BR-07)
+CREATE TRIGGER trg_check_asset_availability
+BEFORE INSERT ON asset_loan
+FOR EACH ROW
+BEGIN
+    DECLARE current_asset_status VARCHAR(50);
+    
+    SELECT status INTO current_asset_status 
+    FROM asset 
+    WHERE asset_id = NEW.asset_id;
+    
+    IF current_asset_status != 'Available' THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'BR-04 & BR-07 Error: Chỉ có thể tạo phiếu mượn cho tài sản đang ở trạng thái Available.';
+    END IF;
+END$$
+
+-- Trigger 5: Ép buộc Quy trình duyệt đơn và Lý do mượn (Áp dụng BR-09)
+CREATE TRIGGER trg_enforce_loan_reason_and_status
+BEFORE INSERT ON asset_loan
+FOR EACH ROW
+BEGIN
+    IF NEW.loan_reason IS NULL OR TRIM(NEW.loan_reason) = '' THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'BR-09 Error: Mọi yêu cầu mượn thiết bị bắt buộc phải có Lý do mượn (loan_reason).';
+    END IF;
+    
+    IF NEW.status IS NULL THEN
+        SET NEW.status = 'Pending';
+    END IF;
+END$$
+
+-- Trigger 6: Tự động cập nhật trạng thái thiết bị theo trạng thái đơn mượn
 CREATE TRIGGER trg_after_update_asset_loan AFTER UPDATE ON asset_loan
 FOR EACH ROW BEGIN
-    IF NEW.status = 'Returned' AND OLD.status != 'Returned' THEN UPDATE asset SET status = 'Available' WHERE asset_id = NEW.asset_id; END IF;
+    IF NEW.status = 'Active' AND OLD.status = 'Pending' THEN 
+        UPDATE asset SET status = 'In Use' WHERE asset_id = NEW.asset_id; 
+    END IF;
+    IF NEW.status = 'Returned' AND OLD.status != 'Returned' THEN 
+        UPDATE asset SET status = 'Available' WHERE asset_id = NEW.asset_id; 
+    END IF;
 END$$
 
+-- Trigger 7: Tự động khóa thiết bị khi bảo trì (Áp dụng BR-07, BR-10)
 CREATE TRIGGER trg_after_insert_maintenance AFTER INSERT ON maintenance_record
 FOR EACH ROW BEGIN
-    IF NEW.status IN ('Pending', 'In Progress') THEN UPDATE asset SET status = 'Under Maintenance' WHERE asset_id = NEW.asset_id; END IF;
+    IF NEW.status IN ('Pending', 'In Progress') THEN 
+        UPDATE asset SET status = 'Under Maintenance' WHERE asset_id = NEW.asset_id; 
+    END IF;
 END$$
 
 DELIMITER ;
 
--- 3. ANALYTICAL VIEWS
+-- ============================================================================
+-- ANALYTICAL VIEWS
+-- ============================================================================
+
+-- View 1: Thống kê danh sách thiết bị quá hạn mượn (Overdue Assets) - ĐÃ FIX HÀM THỜI GIAN
 CREATE OR REPLACE VIEW view_overdue_assets AS
 SELECT 
-    al.loan_id, al.loan_code, a.asset_id, a.asset_code, a.asset_name,
-    p.full_name AS borrower_name, p.email AS borrower_email, p.phone AS borrower_phone,
-    al.checkout_date, al.due_date, DATEDIFF(CURRENT_DATE, al.due_date) AS days_overdue
+    al.loan_id, 
+    al.loan_code, 
+    a.asset_id, 
+    a.asset_code, 
+    a.asset_name,
+    p.full_name AS borrower_name, 
+    p.email AS borrower_email, 
+    p.phone AS borrower_phone,
+    al.checkout_date, 
+    al.due_date, 
+    TIMESTAMPDIFF(HOUR, al.due_date, NOW()) / 24.0 AS days_overdue
 FROM asset_loan al
 JOIN asset a ON al.asset_id = a.asset_id
 JOIN personnel p ON al.personnel_id = p.personnel_id
-WHERE al.status = 'Active' AND al.due_date < CURRENT_DATE;
+WHERE al.status = 'Active' 
+    AND al.due_date < NOW();
 
+-- View 2: Tổng hợp số lượng và tổng giá trị tài sản phân bổ theo Phòng Lab & Khoa
 CREATE OR REPLACE VIEW view_asset_summary_by_lab AS
 SELECT 
-    d.dept_name, l.lab_name, l.room_location,
-    COUNT(a.asset_id) AS total_assets, SUM(a.purchase_price) AS total_asset_value
+    d.dept_name, 
+    l.lab_name, 
+    l.room_location,
+    COUNT(a.asset_id) AS total_assets, 
+    IFNULL(SUM(a.purchase_price), 0.00) AS total_asset_value
 FROM lab l
 JOIN department d ON l.department_id = d.department_id
 LEFT JOIN asset a ON l.lab_id = a.lab_id
