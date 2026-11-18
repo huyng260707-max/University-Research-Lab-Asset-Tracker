@@ -43,7 +43,8 @@ Hệ thống "University Research & Lab Asset Tracker" được xây dựng nh�
 - Non-Functional Requirements:
   + Bảo mật: Mật khẩu người dùng phải được băm (hash) bằng bcrypt.
   + Hiệu năng: Truy vấn lịch sử mượn thiết bị của một phòng lab trong 5 năm phải trả về kết quả dưới 200ms.
-1.3 Business Glossary
+
+   1.3 Business Glossary
   -  Department (Khoa / Bộ môn): Đơn vị hành chính cao nhất quản lý các phòng thí nghiệm.
     o	dept_name: Tên định danh của khoa (ví dụ: Khoa Công nghệ Thông tin).
     o	building: Tòa nhà đặt văn phòng khoa.
