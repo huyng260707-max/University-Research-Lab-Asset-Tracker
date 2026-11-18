@@ -1,4 +1,4 @@
-    {% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-4">
@@ -7,8 +7,8 @@
             <div class="card-body">
                 <form action="{{ url_for('login') }}" method="POST">
                     <div class="mb-3">
-                        <label>Email:</label>
-                        <input type="email" name="email" class="form-control" required>
+                        <label>Đăng nhập Mã SV/GV</label>
+                        <input type="text" name="personnel_code" class="form-control" placeholder="Nhập mã SV / GV (VD: SV202601)" required>
                     </div>
                     <div class="mb-3">
                         <label>Mật khẩu:</label>
